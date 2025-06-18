@@ -1,0 +1,269 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.id }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the previous tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^)
+
+        # Generate changelog between tags
+        echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+        echo "## Changes since $PREV_TAG" >> $GITHUB_OUTPUT
+        echo "" >> $GITHUB_OUTPUT
+        git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD >> $GITHUB_OUTPUT
+        echo "" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          # PDF from EML Extractor ${{ github.ref }}
+
+          Extract PDF attachments from EML (email message) files with this cross-platform tool.
+
+          ## 🚀 Features
+          - Recursive directory scanning for .eml files
+          - Multi-platform support (Linux, macOS, Windows)
+          - Multiple architecture support (AMD64, ARM64, ARM)
+          - Automatic filename collision handling
+          - MIME decoding support
+          - Base64 attachment decoding
+
+          ## 📦 Installation
+
+          Download the appropriate binary for your platform from the assets below.
+
+          ### Quick Install (Linux/macOS)
+          ```bash
+          # Replace with your platform
+          curl -L -o pdf-from-eml https://github.com/fmurodov/pdf-from-eml/releases/download/${{ github.ref }}/pdf-from-eml_linux_amd64.tar.gz
+          tar -xzf pdf-from-eml_linux_amd64.tar.gz
+          chmod +x pdf-from-eml
+          ```
+
+          ### Docker
+          ```bash
+          docker run --rm -v /path/to/eml:/input -v /path/to/output:/output fmurodov/pdf-from-eml:${{ github.ref_name }}
+          ```
+
+          ## 📋 Usage
+          ```bash
+          ./pdf-from-eml -input /path/to/eml/files -output /path/to/output
+          ```
+
+          ## 🔧 Build Information
+          - Go Version: ${{ env.GO_VERSION }}
+          - Built with GitHub Actions
+          - Cross-compiled for multiple platforms
+
+          ${{ steps.changelog.outputs.CHANGELOG }}
+
+          ---
+
+          **Note**: This project uses AI-generated code. Please review and test thoroughly before production use.
+        draft: false
+        prerelease: false
+
+  build-and-upload:
+    name: Build and Upload
+    runs-on: ubuntu-latest
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - goos: linux
+            goarch: amd64
+            asset_name: pdf-from-eml_linux_amd64.tar.gz
+          - goos: linux
+            goarch: arm64
+            asset_name: pdf-from-eml_linux_arm64.tar.gz
+          - goos: linux
+            goarch: arm
+            asset_name: pdf-from-eml_linux_arm.tar.gz
+
+          # macOS builds
+          - goos: darwin
+            goarch: amd64
+            asset_name: pdf-from-eml_darwin_amd64.tar.gz
+          - goos: darwin
+            goarch: arm64
+            asset_name: pdf-from-eml_darwin_arm64.tar.gz
+
+          # Windows builds
+          - goos: windows
+            goarch: amd64
+            asset_name: pdf-from-eml_windows_amd64.zip
+          - goos: windows
+            goarch: arm64
+            asset_name: pdf-from-eml_windows_arm64.zip
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Set binary name
+      id: binary
+      run: |
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          echo "name=pdf-from-eml.exe" >> $GITHUB_OUTPUT
+        else
+          echo "name=pdf-from-eml" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+          -o ${{ steps.binary.outputs.name }} main.go
+
+    - name: Create archive
+      run: |
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          zip ${{ matrix.asset_name }} ${{ steps.binary.outputs.name }}
+        else
+          tar czf ${{ matrix.asset_name }} ${{ steps.binary.outputs.name }}
+        fi
+
+    - name: Generate checksums
+      run: |
+        if command -v shasum > /dev/null; then
+          shasum -a 256 ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
+        else
+          sha256sum ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
+        fi
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./${{ matrix.asset_name }}
+        asset_name: ${{ matrix.asset_name }}
+        asset_content_type: application/gzip
+
+    - name: Upload Checksum
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./${{ matrix.asset_name }}.sha256
+        asset_name: ${{ matrix.asset_name }}.sha256
+        asset_content_type: text/plain
+
+  docker-release:
+    name: Docker Release
+    runs-on: ubuntu-latest
+    needs: create-release
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: fmurodov/pdf-from-eml
+        tags: |
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=raw,value=latest
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64,linux/arm/v7
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ github.ref_name }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  update-readme:
+    name: Update README with Release Info
+    runs-on: ubuntu-latest
+    needs: [create-release, build-and-upload]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update README badges
+      run: |
+        # Update version badge in README
+        sed -i "s/\(version-\)[^-]*\(-blue\)/\1${{ github.ref_name }}\2/" README.md || echo "No version badge found"
+
+        # Update download links (if they exist)
+        sed -i "s/releases\/download\/v[0-9.]*\//releases\/download\/${{ github.ref_name }}\//" README.md || echo "No download links found"
+
+    - name: Commit changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add README.md
+        git diff --staged --quiet || git commit -m "Update README for release ${{ github.ref_name }}"
+        git push || echo "No changes to push"

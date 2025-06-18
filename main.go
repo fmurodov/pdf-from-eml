@@ -19,11 +19,21 @@ import (
 	"golang.org/x/text/transform"          // For transforming data streams
 )
 
+// Version information (set during build)
+var version = "dev"
+
 func main() {
 	// Define command-line flags for input and output directories
 	inputDir := flag.String("input", "", "Path to the input folder containing .eml files")
 	outputDir := flag.String("output", "extracted_pdfs", "Path to the output folder for extracted PDFs")
+	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse() // Parse the command-line arguments
+
+	// Handle version flag
+	if *showVersion {
+		fmt.Printf("pdf-from-eml version %s\n", version)
+		return
+	}
 
 	// Validate that the input directory is provided
 	if *inputDir == "" {

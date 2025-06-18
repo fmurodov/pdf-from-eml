@@ -1,5 +1,11 @@
 # PDF from EML Extractor
 
+[![CI/CD Pipeline](https://github.com/fmurodov/pdf-from-eml/actions/workflows/ci.yml/badge.svg)](https://github.com/fmurodov/pdf-from-eml/actions/workflows/ci.yml)
+[![Release](https://github.com/fmurodov/pdf-from-eml/actions/workflows/release.yml/badge.svg)](https://github.com/fmurodov/pdf-from-eml/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fmurodov/pdf-from-eml)](https://goreportcard.com/report/github.com/fmurodov/pdf-from-eml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Docker](https://img.shields.io/docker/pulls/fmurodov/pdf-from-eml)](https://hub.docker.com/r/fmurodov/pdf-from-eml)
+
 A Go command-line tool that extracts PDF attachments from EML (email message) files. This tool recursively scans directories for `.eml` files and extracts any PDF attachments found within them.
 
 ## Features
@@ -21,27 +27,58 @@ A Go command-line tool that extracts PDF attachments from EML (email message) fi
 
 ## Installation
 
-### Option 1: Clone from GitHub
+### Option 1: Download Pre-built Binaries (Recommended)
 
+Download the latest release for your platform from the [releases page](https://github.com/fmurodov/pdf-from-eml/releases):
+
+#### Linux (AMD64)
 ```bash
-git clone https://github.com/fmurodov/pdf-from-eml.git
-cd pdf-from-eml
-go build -o pdf-from-eml main.go
+curl -L -o pdf-from-eml.tar.gz https://github.com/fmurodov/pdf-from-eml/releases/latest/download/pdf-from-eml_linux_amd64.tar.gz
+tar -xzf pdf-from-eml.tar.gz
+chmod +x pdf-from-eml
+sudo mv pdf-from-eml /usr/local/bin/
 ```
 
-### Option 2: Install directly with Go
+#### macOS (AMD64)
+```bash
+curl -L -o pdf-from-eml.tar.gz https://github.com/fmurodov/pdf-from-eml/releases/latest/download/pdf-from-eml_darwin_amd64.tar.gz
+tar -xzf pdf-from-eml.tar.gz
+chmod +x pdf-from-eml
+sudo mv pdf-from-eml /usr/local/bin/
+```
+
+#### macOS (Apple Silicon)
+```bash
+curl -L -o pdf-from-eml.tar.gz https://github.com/fmurodov/pdf-from-eml/releases/latest/download/pdf-from-eml_darwin_arm64.tar.gz
+tar -xzf pdf-from-eml.tar.gz
+chmod +x pdf-from-eml
+sudo mv pdf-from-eml /usr/local/bin/
+```
+
+#### Windows (AMD64)
+Download the `.zip` file from the releases page and extract it to your desired location.
+
+### Option 2: Install with Go
 
 ```bash
 go install github.com/fmurodov/pdf-from-eml@latest
 ```
 
-### Option 3: Download and build manually
-
-1. Download this repository
-2. Navigate to the project directory
-3. Build the application:
+### Option 3: Docker
 
 ```bash
+# Run with Docker
+docker run --rm -v /path/to/eml/files:/input -v /path/to/output:/output fmurodov/pdf-from-eml:latest
+
+# Or pull the image first
+docker pull fmurodov/pdf-from-eml:latest
+```
+
+### Option 4: Build from Source
+
+```bash
+git clone https://github.com/fmurodov/pdf-from-eml.git
+cd pdf-from-eml
 go build -o pdf-from-eml main.go
 ```
 
@@ -63,6 +100,7 @@ go build -o pdf-from-eml main.go
 
 - `-input`: **Required**. Path to the input folder containing `.eml` files
 - `-output`: Optional. Path to the output folder for extracted PDFs (default: `extracted_pdfs`)
+- `-version`: Show version information
 
 ### Examples
 
@@ -79,6 +117,28 @@ Extract PDFs with custom output directory:
 Extract PDFs from a nested directory structure:
 ```bash
 ./pdf-from-eml -input /home/user/Documents/archived_emails -output /home/user/Documents/extracted_pdfs
+```
+
+Check version:
+```bash
+./pdf-from-eml -version
+```
+
+### Docker Usage
+
+```bash
+# Basic usage
+docker run --rm \
+  -v /path/to/your/eml/files:/input \
+  -v /path/to/output/directory:/output \
+  fmurodov/pdf-from-eml:latest
+
+# With custom options (not applicable as Docker uses default CMD)
+docker run --rm \
+  -v /path/to/your/eml/files:/input \
+  -v /path/to/output/directory:/output \
+  fmurodov/pdf-from-eml:latest \
+  -input /input -output /output
 ```
 
 ## How It Works
@@ -124,6 +184,26 @@ The tool provides detailed console output including:
 - Base64 encoded attachments
 - Various character encodings (UTF-8, ISO-8859-1, etc.)
 - Inline and attached PDFs
+
+## Supported Platforms
+
+This tool is built and tested on multiple platforms and architectures:
+
+| OS      | AMD64 | ARM64 | ARM |
+|---------|-------|-------|-----|
+| Linux   | ✅    | ✅    | ✅  |
+| macOS   | ✅    | ✅    | ❌  |
+| Windows | ✅    | ✅    | ❌  |
+
+## CI/CD and Quality Assurance
+
+This project uses GitHub Actions for:
+- **Continuous Integration**: Automated testing on every commit
+- **Cross-platform Building**: Automated builds for all supported platforms
+- **Security Scanning**: Automated security vulnerability checks
+- **Code Quality**: Static analysis with `go vet` and `staticcheck`
+- **Docker Images**: Multi-architecture Docker images
+- **Automated Releases**: Tagged releases with pre-built binaries
 
 ## AI Generated Code Notice
 
