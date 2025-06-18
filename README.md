@@ -21,7 +21,7 @@ A Go command-line tool that extracts PDF attachments from EML (email message) fi
 
 ## Requirements
 
-- Go 1.24.4 or later
+- Go 1.24 or later
 - Dependencies (automatically managed via Go modules):
   - `golang.org/x/text v0.26.0`
 
